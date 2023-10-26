@@ -28,6 +28,7 @@ componentParser = do
   char '}'
   return (Component name price componentType spec description)
 
+
 -- Парсер для всего файла
 fileParser :: GenParser Char () [Component]
 fileParser = many (componentParser <* optional (char '\n'))
@@ -37,6 +38,10 @@ parseFile :: FilePath -> IO (Either ParseError [Component])
 parseFile filename = do
   contents <- readFile filename
   return (parse fileParser filename contents)
+
+
+
+---1 кнопка----------------------------------
 
 -- Вывод доступных компонентов
 printAvailableComponents :: [Component] -> IO ()
@@ -57,6 +62,8 @@ printComponentInfo comp = do
 getComponentsByType :: [Component] -> String -> [Component]
 getComponentsByType components compType =
   filter (\comp -> componentType comp == compType) components
+
+--------------------------------------------------------------
 
 main :: IO ()
 main = do
