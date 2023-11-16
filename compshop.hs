@@ -109,68 +109,82 @@ printNumberedOptions :: [String] -> IO ()
 printNumberedOptions options = do
   mapM_ (\(index, option) -> putStrLn (show index ++ ". " ++ option)) (zip [1 ..] options)
 
-
 -- Опция сборки компьютера
 assembleComputerOption :: Order -> Int -> IO Order
-assembleComputerOption order budget = do
-  specs <- loadSpecificationsFromComponents "components.txt"
-  result <- parseFile "components.txt"
-  case result of
-    Left err -> do
-      putStrLn ("Parsing error: " ++ show err)
-      return order
-    Right components -> do
-      componentType <- chooseComponentType
-      let filteredComponents = getComponentsByType components componentType
-      if null filteredComponents
-        then do
-          putStrLn "No components found for the specified type"
-          return order
-        else do
-          componentSpecChoice <- chooseComponentSpec (nub $ map componentSpec filteredComponents)
-          let selectedComponents = filter (\comp -> componentSpecChoice == componentSpec comp) filteredComponents
-          if null selectedComponents
-            then do
-              putStrLn "No components found for the specified specification"
-              return order
-            else do
-              putStrLn "Available components for the chosen specification:"
-              mapM_ printComponentInfo selectedComponents
-              putStrLn "Do you want to buy a component? (y/n)"
-              choice <- getLine
-              case choice of
-                "y" -> do
-                  putStrLn "Enter the number of the component you want to buy:"
-                  buyChoice <- getLine
-                  case readMaybe buyChoice of
-                    Just index ->
-                      if index >= 1 && index <= length selectedComponents
-                        then do
-                          let selectedComponent = selectedComponents !! (index - 1)
-                          if orderTotalCost order + componentPrice selectedComponent <= budget
-                            then do
-                              putStrLn $ "You add " ++ componentName selectedComponent ++ " for " ++ show (componentPrice selectedComponent) ++ "$"
-                              let newOrder = Order {orderComponents = selectedComponent : orderComponents order, orderTotalCost = orderTotalCost order + componentPrice selectedComponent}
-                              putStrLn $ "Total cost so far: " ++ show (orderTotalCost newOrder) ++ "$"
-                              assembleComputerOption newOrder budget
-                            else do
-                              putStrLn "Purchase canceled. Negative budget."
-                              return order
-                        else do
-                          putStrLn "Invalid choice. Purchase canceled."
-                          return order
-                    _ -> do
-                      putStrLn "Invalid choice. Purchase canceled."
-                      return order
-                _ -> do
-                  putStrLn "Purchase canceled."
-                  return order
+assembleComputerOption order budget
+  | budget <= 0 = do
+    putStrLn "Invalid budget. Exiting. (-1 or 0)"
+    return order
+  | otherwise = do
+    specs <- loadSpecificationsFromComponents "components.txt"
+    result <- parseFile "components.txt"
+    case result of
+      Left err -> do
+        putStrLn ("Parsing error: " ++ show err)
+        return order
+      Right components -> do
+        componentType <- chooseComponentType
+        if componentType == "0"
+          then do
+            putStrLn "Exiting assemble."
+            return order
+          else do
+            let filteredComponents = getComponentsByType components componentType
+            if null filteredComponents
+              then do
+                putStrLn "No components found for the specified type"
+                return order
+              else do
+                componentSpecChoice <- chooseComponentSpec (nub $ map componentSpec filteredComponents)
+                let selectedComponents = filter (\comp -> componentSpecChoice == componentSpec comp) filteredComponents
+                if null selectedComponents
+                  then do
+                    putStrLn "No components found for the specified specification"
+                    return order
+                  else do
+                    putStrLn "Available components for the chosen specification:"
+                    mapM_ printComponentInfo selectedComponents
+                    putStrLn "Do you want to buy a component? (y/n)"
+                    choice <- getLine
+                    case choice of
+                      "y" -> do
+                        putStrLn "Enter the number of the component you want to buy:"
+                        buyChoice <- getLine
+                        case readMaybe buyChoice of
+                          Just index ->
+                            if index >= 1 && index <= length selectedComponents
+                              then do
+                                let selectedComponent = selectedComponents !! (index - 1)
+                                if orderTotalCost order + componentPrice selectedComponent <= budget
+                                  then do
+                                    putStrLn $ "You add " ++ componentName selectedComponent ++ " for " ++ show (componentPrice selectedComponent) ++ "$"
+                                    let newOrder = Order {orderComponents = selectedComponent : orderComponents order, orderTotalCost = orderTotalCost order + componentPrice selectedComponent}
+                                    putStrLn $ "Total cost so far: " ++ show (orderTotalCost newOrder) ++ "$"
+                                    assembleComputerOption newOrder budget
+                                  else do
+                                    putStrLn "Purchase canceled. Negative budget."
+                                    return order
+                              else do
+                                putStrLn "Invalid choice. Purchase canceled."
+                                return order
+                          _ -> do
+                            putStrLn "Invalid choice. Purchase canceled."
+                            return order
+                      _ -> do
+                        putStrLn "Purchase canceled."
+                        return order
 
 -- Выбор типа компонента
 chooseComponentType :: IO String
 chooseComponentType = do
   putStrLn "Enter the component type you want to add to your computer (Processor, Graphics Card, Motherboard, RAM, Hard Drive, Power Supply) or press 0 to exit assemble:"
   getLine
+
+-- Просмотр всего заказа
+viewOrder :: Order -> IO ()
+viewOrder order = do
+  putStrLn "Your order:"
+  mapM_ printComponentInfo (orderComponents order)
 
 -- Основная функция программы
 main :: IO ()
@@ -199,15 +213,11 @@ main = do
     "2" -> do
       putStrLn "Enter your budget:"
       budget <- read <$> getLine :: IO Int
-      if budget <= 0
-        then do 
-          putStrLn "Invalid budget. Exiting. (-1 or 0)"
-          main
-        else do
-          let initialOrder = Order {orderComponents = [], orderTotalCost = 0}
-          finalOrder <- assembleComputerOption initialOrder budget
-          putStrLn $ "Total cost of your order: " ++ show (orderTotalCost finalOrder) ++ "$"
-          main
+      let initialOrder = Order {orderComponents = [], orderTotalCost = 0}
+      finalOrder <- assembleComputerOption initialOrder budget
+      viewOrder finalOrder
+      putStrLn $ "Total cost of your order: " ++ show (orderTotalCost finalOrder) ++ "$"
+      main
 
     "3" -> putStrLn "Goodbye, dude!"
 
