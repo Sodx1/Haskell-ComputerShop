@@ -61,12 +61,6 @@ parseFile filename = do
   contents <- readFile filename
   return (parse fileParser filename contents)
 
--- Вывод доступных компонентов
-printAvailableComponents :: [Component] -> IO ()
-printAvailableComponents components = do
-  putStrLn "Available components:"
-  mapM_ (\comp -> putStrLn $ componentName comp ++ " (" ++ componentType comp ++ ")") components
-
 -- Вывод информации о выбранном компоненте
 printComponentInfo :: Component -> IO ()
 printComponentInfo comp = do
@@ -115,18 +109,10 @@ printNumberedOptions :: [String] -> IO ()
 printNumberedOptions options = do
   mapM_ (\(index, option) -> putStrLn (show index ++ ". " ++ option)) (zip [1 ..] options)
 
--- Основная функция сборки компьютера
-assembleComputer :: Component -> IO ()
-assembleComputer comp = do
-  putStrLn "Assembling the computer..."
-  putStrLn "Selected component:"
-  printComponentInfo comp
-  putStrLn $ "Total cost: " ++ show (componentPrice comp) ++ "$"
-  putStrLn "Thank you for your purchase!"
 
 -- Опция сборки компьютера
-assembleComputerOption :: Order -> IO Order
-assembleComputerOption order = do
+assembleComputerOption :: Order -> Int -> IO Order
+assembleComputerOption order budget = do
   specs <- loadSpecificationsFromComponents "components.txt"
   result <- parseFile "components.txt"
   case result of
@@ -161,10 +147,15 @@ assembleComputerOption order = do
                       if index >= 1 && index <= length selectedComponents
                         then do
                           let selectedComponent = selectedComponents !! (index - 1)
-                          putStrLn $ "You bought " ++ componentName selectedComponent ++ " for " ++ show (componentPrice selectedComponent) ++ "$"
-                          let newOrder = Order {orderComponents = selectedComponent : orderComponents order, orderTotalCost = orderTotalCost order + componentPrice selectedComponent}
-                          putStrLn $ "Total cost so far: " ++ show (orderTotalCost newOrder) ++ "$"
-                          assembleComputerOption newOrder
+                          if orderTotalCost order + componentPrice selectedComponent <= budget
+                            then do
+                              putStrLn $ "You add " ++ componentName selectedComponent ++ " for " ++ show (componentPrice selectedComponent) ++ "$"
+                              let newOrder = Order {orderComponents = selectedComponent : orderComponents order, orderTotalCost = orderTotalCost order + componentPrice selectedComponent}
+                              putStrLn $ "Total cost so far: " ++ show (orderTotalCost newOrder) ++ "$"
+                              assembleComputerOption newOrder budget
+                            else do
+                              putStrLn "Purchase canceled. Negative budget."
+                              return order
                         else do
                           putStrLn "Invalid choice. Purchase canceled."
                           return order
@@ -178,7 +169,7 @@ assembleComputerOption order = do
 -- Выбор типа компонента
 chooseComponentType :: IO String
 chooseComponentType = do
-  putStrLn "Enter the component type you want to add to your computer (Processor, Graphics Card, Motherboard, RAM, Hard Drive, Power Supply):"
+  putStrLn "Enter the component type you want to add to your computer (Processor, Graphics Card, Motherboard, RAM, Hard Drive, Power Supply) or press 0 to exit assemble:"
   getLine
 
 -- Основная функция программы
@@ -208,10 +199,15 @@ main = do
     "2" -> do
       putStrLn "Enter your budget:"
       budget <- read <$> getLine :: IO Int
-      let initialOrder = Order {orderComponents = [], orderTotalCost = 0}
-      finalOrder <- assembleComputerOption initialOrder
-      putStrLn $ "Total cost of your order: " ++ show (orderTotalCost finalOrder) ++ "$"
-      main
+      if budget <= 0
+        then do 
+          putStrLn "Invalid budget. Exiting. (-1 or 0)"
+          main
+        else do
+          let initialOrder = Order {orderComponents = [], orderTotalCost = 0}
+          finalOrder <- assembleComputerOption initialOrder budget
+          putStrLn $ "Total cost of your order: " ++ show (orderTotalCost finalOrder) ++ "$"
+          main
 
     "3" -> putStrLn "Goodbye, dude!"
 
